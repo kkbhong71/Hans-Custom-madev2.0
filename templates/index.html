@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Han's Lotto Lab v2.0 — AI 로또 예측 시스템</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-card: #16161f;
+            --bg-card-hover: #1c1c28;
+            --gold: #d4a853;
+            --gold-light: #f0d78c;
+            --gold-dark: #a07830;
+            --emerald: #2dd4a8;
+            --emerald-dark: #1a9e7a;
+            --ruby: #ef4444;
+            --sapphire: #3b82f6;
+            --text-primary: #eeeef0;
+            --text-secondary: #8888a0;
+            --text-muted: #555570;
+            --border: #252535;
+            --border-gold: rgba(212, 168, 83, 0.2);
+
+            /* Ball colors */
+            --ball-yellow: #FBC400;
+            --ball-blue: #69C8F2;
+            --ball-red: #FF7272;
+            --ball-gray: #AAAAAA;
+            --ball-green: #B0D840;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Noto Sans KR', 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* === Animated Background === */
+        .bg-pattern {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                radial-gradient(ellipse at 20% 20%, rgba(212,168,83,0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(45,212,168,0.03) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(10,10,15,1) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        .floating-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.15;
+            animation: float 20s ease-in-out infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .orb-1 { width: 400px; height: 400px; background: var(--gold); top: -100px; left: -100px; animation-delay: 0s; }
+        .orb-2 { width: 300px; height: 300px; background: var(--emerald); bottom: -50px; right: -50px; animation-delay: -7s; }
+        .orb-3 { width: 250px; height: 250px; background: var(--sapphire); top: 50%; left: 50%; animation-delay: -14s; }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -40px) scale(1.05); }
+            66% { transform: translate(-20px, 30px) scale(0.95); }
+        }
+
+        /* === Layout === */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* === Header === */
+        header {
+            padding: 40px 0 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .logo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border: 1px solid var(--border-gold);
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 20px;
+            background: rgba(212,168,83,0.05);
+        }
+
+        .logo-badge .dot {
+            width: 6px; height: 6px;
+            background: var(--gold);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 50%, var(--gold-dark) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.1;
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 300;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        /* === Info Bar === */
+        .info-bar {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            padding: 20px 0;
+            margin: 16px 0 30px;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-item .label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .info-item .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        /* === Controls === */
+        .controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-group label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .control-group select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .control-group select:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .btn-predict {
+            position: relative;
+            padding: 14px 48px;
+            background: linear-gradient(135deg, var(--gold-dark), var(--gold), var(--gold-light));
+            color: #0a0a0f;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+
+        .btn-predict::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: linear-gradient(135deg, var(--gold), var(--gold-light), var(--gold));
+            border-radius: 14px;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn-predict:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(212,168,83,0.3);
+        }
+
+        .btn-predict:hover::before { opacity: 1; }
+
+        .btn-predict:active {
+            transform: translateY(0);
+        }
+
+        .btn-predict.loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .btn-predict .spinner {
+            display: none;
+            width: 20px; height: 20px;
+            border: 2px solid rgba(10,10,15,0.3);
+            border-top-color: #0a0a0f;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .btn-predict.loading .btn-text { display: none; }
+        .btn-predict.loading .spinner { display: inline-block; }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* === Tabs === */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 32px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 4px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px 16px;
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-radius: 8px;
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--bg-card);
+            color: var(--gold);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: var(--text-primary);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeUp 0.4s ease; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* === Results Section === */
+        .results-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .results-header h2 {
+            font-family: 'Playfair Display', serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .coverage-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 24px;
+            margin: 16px 0;
+            flex-wrap: wrap;
+        }
+
+        .cov-stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cov-stat .icon {
+            font-size: 18px;
+        }
+
+        .cov-stat .cov-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+        }
+
+        .cov-stat .cov-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--emerald);
+        }
+
+        /* === Window Group === */
+        .window-group {
+            margin-bottom: 32px;
+        }
+
+        .window-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .window-label .badge {
+            padding: 4px 12px;
+            background: rgba(212,168,83,0.1);
+            border: 1px solid var(--border-gold);
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gold);
+        }
+
+        .window-label .desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* === Prediction Card === */
+        .prediction-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 16px;
+        }
+
+        .pred-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pred-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--gold), var(--emerald));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .pred-card:hover {
+            border-color: var(--border-gold);
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .pred-card:hover::before { opacity: 1; }
+
+        .pred-card.star::before {
+            opacity: 1;
+            background: linear-gradient(90deg, var(--gold-light), var(--gold), var(--gold-light));
+        }
+
+        .pred-card.shield::before {
+            opacity: 1;
+            background: linear-gradient(90deg, var(--emerald), var(--sapphire));
+        }
+
+        .card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .algo-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .algo-code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(212,168,83,0.1);
+            color: var(--gold);
+        }
+
+        .algo-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .card-icon {
+            font-size: 22px;
+        }
+
+        /* === Lotto Balls === */
+        .balls-row {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin: 16px 0;
+        }
+
+        .lotto-ball {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: #0a0a0f;
+            position: relative;
+            animation: ballPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+            box-shadow: inset 0 -4px 8px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .lotto-ball::after {
+            content: '';
+            position: absolute;
+            top: 6px;
+            left: 10px;
+            width: 14px;
+            height: 8px;
+            background: rgba(255,255,255,0.35);
+            border-radius: 50%;
+            transform: rotate(-20deg);
+        }
+
+        @keyframes ballPop {
+            from { transform: scale(0) rotate(-180deg); opacity: 0; }
+            to { transform: scale(1) rotate(0); opacity: 1; }
+        }
+
+        .balls-row .lotto-ball:nth-child(1) { animation-delay: 0.05s; }
+        .balls-row .lotto-ball:nth-child(2) { animation-delay: 0.1s; }
+        .balls-row .lotto-ball:nth-child(3) { animation-delay: 0.15s; }
+        .balls-row .lotto-ball:nth-child(4) { animation-delay: 0.2s; }
+        .balls-row .lotto-ball:nth-child(5) { animation-delay: 0.25s; }
+        .balls-row .lotto-ball:nth-child(6) { animation-delay: 0.3s; }
+
+        /* === Card Stats === */
+        .card-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .stat-chip {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .stat-chip span {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* === Analysis Tab === */
+        .chart-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .freq-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 180px;
+            padding-bottom: 28px;
+            position: relative;
+            overflow-x: auto;
+        }
+
+        .freq-bar-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            min-width: 20px;
+            position: relative;
+            height: 100%;
+            justify-content: flex-end;
+        }
+
+        .freq-bar {
+            width: 100%;
+            max-width: 18px;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+            cursor: pointer;
+        }
+
+        .freq-bar:hover {
+            opacity: 0.8;
+            transform: scaleY(1.05);
+            transform-origin: bottom;
+        }
+
+        .freq-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: var(--text-muted);
+            position: absolute;
+            bottom: -22px;
+            text-align: center;
+        }
+
+        /* Pool Legend */
+        .pool-legend {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 10px; height: 10px;
+            border-radius: 3px;
+        }
+
+        .legend-dot.hot { background: var(--ruby); }
+        .legend-dot.warm { background: var(--gold); }
+        .legend-dot.cold { background: var(--sapphire); }
+
+        /* === Recent Draws === */
+        .draw-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 8px;
+        }
+
+        .draw-table th {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .draw-table td {
+            padding: 12px;
+            background: var(--bg-card);
+            font-size: 14px;
+        }
+
+        .draw-table tr td:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+
+        .draw-table tr td:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+
+        .draw-round {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .draw-date {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .mini-balls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .mini-ball {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 700;
+            color: #0a0a0f;
+            box-shadow: inset 0 -2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* === Empty State === */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-text {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .empty-sub {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        /* === Footer === */
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            margin-top: 40px;
+            border-top: 1px solid var(--border);
+        }
+
+        footer p {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.8;
+        }
+
+        footer .highlight {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        /* === Responsive === */
+        @media (max-width: 768px) {
+            .info-bar { gap: 16px; }
+            .prediction-grid { grid-template-columns: 1fr; }
+            .controls { flex-direction: column; }
+            .balls-row .lotto-ball { width: 42px; height: 42px; font-size: 14px; }
+            .freq-chart { height: 140px; }
+        }
+
+        /* === Scrollbar === */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* === Toast / Notification === */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 14px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--emerald);
+            border-radius: 12px;
+            font-size: 14px;
+            color: var(--emerald);
+            z-index: 1000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Copy button */
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+
+        /* Section Distribution Bar */
+        .section-bar {
+            display: flex;
+            gap: 2px;
+            height: 4px;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .section-seg {
+            flex: 1;
+            border-radius: 2px;
+            transition: all 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+    <div class="floating-orb orb-1"></div>
+    <div class="floating-orb orb-2"></div>
+    <div class="floating-orb orb-3"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo-badge">
+                <span class="dot"></span>
+                <span>Brother Lotto System</span>
+            </div>
+            <h1>Han's Lotto Lab</h1>
+            <p class="subtitle">v2.0 Coverage Optimized — AI 기반 로또 번호 예측 시스템</p>
+        </header>
+
+        <!-- Info Bar -->
+        <div class="info-bar" id="infoBar">
+            <div class="info-item">
+                <div class="label">전체 데이터</div>
+                <div class="value" id="totalRounds">—</div>
+            </div>
+            <div class="info-item">
+                <div class="label">최신 회차</div>
+                <div class="value" id="latestRound">—</div>
+            </div>
+            <div class="info-item">
+                <div class="label">합계 범위</div>
+                <div class="value" id="sumRange">—</div>
+            </div>
+            <div class="info-item">
+                <div class="label">최소 AC값</div>
+                <div class="value" id="acMin">—</div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label>세트 수</label>
+                <select id="outputCount">
+                    <option value="7">7세트</option>
+                    <option value="14">14세트</option>
+                    <option value="21" selected>21세트</option>
+                    <option value="28">28세트</option>
+                </select>
+            </div>
+            <button class="btn-predict" id="predictBtn" onclick="runPrediction()">
+                <span class="btn-text">🎱 예측 실행</span>
+                <span class="spinner"></span>
+            </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('results')">🏆 예측 결과</button>
+            <button class="tab-btn" onclick="switchTab('analysis')">📊 번호 분석</button>
+            <button class="tab-btn" onclick="switchTab('history')">📋 최근 당첨</button>
+        </div>
+
+        <!-- Tab: Results -->
+        <div class="tab-content active" id="tab-results">
+            <div id="resultsContainer">
+                <div class="empty-state">
+                    <div class="empty-icon">🎱</div>
+                    <div class="empty-text">예측 결과가 여기에 표시됩니다</div>
+                    <div class="empty-sub">위의 '예측 실행' 버튼을 눌러 AI 기반 번호를 생성하세요</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Analysis -->
+        <div class="tab-content" id="tab-analysis">
+            <div class="controls" style="margin-bottom: 20px;">
+                <div class="control-group">
+                    <label>분석 구간</label>
+                    <select id="analysisWindow" onchange="loadAnalysis()">
+                        <option value="30">최근 30회</option>
+                        <option value="50" selected>최근 50회</option>
+                        <option value="100">최근 100회</option>
+                    </select>
+                </div>
+            </div>
+            <div id="analysisContainer">
+                <div class="chart-container">
+                    <div class="chart-title">번호별 출현 빈도</div>
+                    <div class="freq-chart" id="freqChart"></div>
+                    <div class="pool-legend">
+                        <div class="legend-item"><div class="legend-dot hot"></div>Hot (z > 0.5)</div>
+                        <div class="legend-item"><div class="legend-dot warm"></div>Warm (-0.5 ≤ z ≤ 0.5)</div>
+                        <div class="legend-item"><div class="legend-dot cold"></div>Cold (z < -0.5)</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Hot / Warm / Cold 분류</div>
+                    <div id="poolSummary" style="padding: 12px 0;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: History -->
+        <div class="tab-content" id="tab-history">
+            <div id="historyContainer"></div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>
+                <span class="highlight">Han's Lotto Lab v2.0</span> — Brother Lotto System Coverage Optimized<br>
+                z-score 기반 Hot/Cold 분류 · 7알고리즘 × 3윈도우 · 글로벌 커버리지 최적화<br>
+                ⚠️ 본 시스템은 통계적 분석 도구이며, 당첨을 보장하지 않습니다.
+            </p>
+        </footer>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // === State ===
+        let systemInfo = null;
+
+        // === Init ===
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSystemInfo();
+            loadAnalysis();
+            loadHistory();
+        });
+
+        // === API Calls ===
+        async function loadSystemInfo() {
+            try {
+                const res = await fetch('/api/info');
+                systemInfo = await res.json();
+                document.getElementById('totalRounds').textContent = systemInfo.total_rounds + '회';
+                document.getElementById('latestRound').textContent = systemInfo.latest_round + '회';
+                document.getElementById('sumRange').textContent = systemInfo.sum_range;
+                document.getElementById('acMin').textContent = '≥ ' + systemInfo.ac_min;
+            } catch (e) {
+                console.error('Info load error:', e);
+            }
+        }
+
+        async function runPrediction() {
+            const btn = document.getElementById('predictBtn');
+            btn.classList.add('loading');
+
+            try {
+                const outputCount = parseInt(document.getElementById('outputCount').value);
+                const res = await fetch('/api/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        windows: [30, 50, 100],
+                        output_count: outputCount
+                    })
+                });
+                const data = await res.json();
+                renderResults(data);
+                showToast('🎱 ' + data.stats.total_sets + '세트 예측 완료!');
+            } catch (e) {
+                console.error('Prediction error:', e);
+                showToast('❌ 예측 중 오류가 발생했습니다');
+            } finally {
+                btn.classList.remove('loading');
+            }
+        }
+
+        async function loadAnalysis() {
+            try {
+                const window = document.getElementById('analysisWindow').value;
+                const res = await fetch('/api/pool/' + window);
+                const data = await res.json();
+                renderFreqChart(data);
+                renderPoolSummary(data);
+            } catch (e) {
+                console.error('Analysis error:', e);
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/api/recent?n=15');
+                const draws = await res.json();
+                renderHistory(draws);
+            } catch (e) {
+                console.error('History error:', e);
+            }
+        }
+
+        // === Render Functions ===
+        function renderResults(data) {
+            const container = document.getElementById('resultsContainer');
+            const { results, stats } = data;
+
+            // Group by window
+            const byWindow = {};
+            results.forEach(r => {
+                if (!byWindow[r.window]) byWindow[r.window] = [];
+                byWindow[r.window].push(r);
+            });
+
+            let html = `
+                <div class="results-header">
+                    <h2>🏆 AI 예측 결과</h2>
+                    <div class="coverage-bar">
+                        <div class="cov-stat">
+                            <span class="icon">📊</span>
+                            <div>
+                                <div class="cov-label">커버리지</div>
+                                <div class="cov-value">${stats.coverage}/45 (${stats.coverage_pct}%)</div>
+                            </div>
+                        </div>
+                        <div class="cov-stat">
+                            <span class="icon">🔗</span>
+                            <div>
+                                <div class="cov-label">평균 겹침</div>
+                                <div class="cov-value">${stats.avg_overlap}개</div>
+                            </div>
+                        </div>
+                        <div class="cov-stat">
+                            <span class="icon">🎯</span>
+                            <div>
+                                <div class="cov-label">총 세트</div>
+                                <div class="cov-value">${stats.total_sets}세트</div>
+                            </div>
+                        </div>
+                    </div>
+                    ${stats.uncovered.length > 0 ? `<p style="font-size:12px;color:var(--text-muted);">미커버 번호: ${stats.uncovered.join(', ')}</p>` : ''}
+                </div>
+            `;
+
+            const windowLabels = { 30: '단기 트렌드', 50: '중기 트렌드', 100: '장기 트렌드' };
+
+            Object.keys(byWindow).sort((a, b) => a - b).forEach(w => {
+                const items = byWindow[w];
+                html += `
+                    <div class="window-group">
+                        <div class="window-label">
+                            <span class="badge">최근 ${w}회</span>
+                            <span class="desc">${windowLabels[w] || ''} · ${items.length}세트</span>
+                        </div>
+                        <div class="prediction-grid">
+                `;
+
+                items.forEach((item, idx) => {
+                    const icon = item.algo_code === 'F' ? '🌟' : (item.algo_code === 'G' ? '🛡️' : '🔹');
+                    const cardClass = item.algo_code === 'F' ? 'star' : (item.algo_code === 'G' ? 'shield' : '');
+                    const numsStr = item.numbers.join(', ');
+
+                    const secColors = ['var(--ball-yellow)', 'var(--ball-blue)', 'var(--ball-red)', 'var(--ball-gray)', 'var(--ball-green)'];
+
+                    html += `
+                        <div class="pred-card ${cardClass}">
+                            <div class="card-top">
+                                <div class="algo-badge">
+                                    <span class="algo-code">${item.algo_code}</span>
+                                    <span class="algo-name">${item.algo_name}</span>
+                                </div>
+                                <span class="card-icon">${icon}</span>
+                            </div>
+                            <div class="balls-row">
+                                ${item.numbers.map((n, i) => `
+                                    <div class="lotto-ball" style="background:${item.colors[i]};">${n}</div>
+                                `).join('')}
+                            </div>
+                            <div class="section-bar">
+                                ${item.sections.map((s, i) => `
+                                    <div class="section-seg" style="background:${secColors[i]};opacity:${s > 0 ? 0.3 + s * 0.25 : 0.08};"></div>
+                                `).join('')}
+                            </div>
+                            <div class="card-stats">
+                                <span class="stat-chip">합 <span>${item.sum}</span></span>
+                                <span class="stat-chip">홀 <span>${item.odd_count}</span></span>
+                                <span class="stat-chip">AC <span>${item.ac}</span></span>
+                                <button class="copy-btn" onclick="copyNums('${numsStr}')">복사</button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                html += `</div></div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderFreqChart(data) {
+            const chart = document.getElementById('freqChart');
+            const maxFreq = Math.max(...data.freq_data.map(d => d.frequency), 1);
+
+            chart.innerHTML = data.freq_data.map(d => {
+                const height = Math.max((d.frequency / maxFreq) * 100, 2);
+                const catColor = d.category === 'hot' ? 'var(--ruby)' :
+                                 d.category === 'warm' ? 'var(--gold)' : 'var(--sapphire)';
+                return `
+                    <div class="freq-bar-wrap" title="${d.number}번: ${d.frequency}회 (z=${d.z_score})">
+                        <div class="freq-bar" style="height:${height}%;background:${catColor};"></div>
+                        <span class="freq-num">${d.number}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderPoolSummary(data) {
+            const container = document.getElementById('poolSummary');
+            container.innerHTML = `
+                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:200px;padding:16px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.15);border-radius:12px;">
+                        <div style="font-size:12px;color:var(--ruby);font-weight:600;margin-bottom:8px;">🔥 Hot Numbers (${data.hot_count}개)</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                            ${data.hot_numbers.map(n => `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${getBallColor(n)};color:#0a0a0f;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;">${n}</span>`).join('')}
+                        </div>
+                    </div>
+                    <div style="flex:1;min-width:200px;padding:16px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.15);border-radius:12px;">
+                        <div style="font-size:12px;color:var(--sapphire);font-weight:600;margin-bottom:8px;">❄️ Cold Numbers (${data.cold_count}개)</div>
+                        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                            ${data.cold_numbers.map(n => `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:${getBallColor(n)};color:#0a0a0f;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;opacity:0.6;">${n}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">
+                    기대빈도: ${data.expected}회 · 표준편차: ${data.std}
+                </div>
+            `;
+        }
+
+        function renderHistory(draws) {
+            const container = document.getElementById('historyContainer');
+
+            let html = `<table class="draw-table">
+                <thead>
+                    <tr>
+                        <th>회차</th>
+                        <th>추첨일</th>
+                        <th>당첨번호</th>
+                        <th>합계</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            draws.forEach(d => {
+                html += `
+                    <tr>
+                        <td><span class="draw-round">${d.round}</span></td>
+                        <td><span class="draw-date">${d.date}</span></td>
+                        <td>
+                            <div class="mini-balls">
+                                ${d.numbers.map((n, i) => `<div class="mini-ball" style="background:${d.colors[i]};">${n}</div>`).join('')}
+                            </div>
+                        </td>
+                        <td style="font-family:'JetBrains Mono',monospace;font-size:13px;">${d.sum}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        // === Utilities ===
+        function getBallColor(n) {
+            if (n >= 1 && n <= 10) return '#FBC400';
+            if (n >= 11 && n <= 20) return '#69C8F2';
+            if (n >= 21 && n <= 30) return '#FF7272';
+            if (n >= 31 && n <= 40) return '#AAAAAA';
+            return '#B0D840';
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', ['results', 'analysis', 'history'][i] === tabId);
+            });
+            document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+        }
+
+        function copyNums(nums) {
+            navigator.clipboard.writeText(nums).then(() => showToast('📋 번호가 복사되었습니다'));
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+    </script>
+</body>
+</html>
