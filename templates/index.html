@@ -181,8 +181,61 @@
             justify-content: center;
             align-items: center;
             gap: 16px;
-            margin-bottom: 40px;
+            margin-bottom: 24px;
             flex-wrap: wrap;
+        }
+
+        .window-selectors {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .window-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: border-color 0.2s;
+        }
+
+        .window-selector:hover {
+            border-color: rgba(212,168,83,0.3);
+        }
+
+        .window-selector .ws-icon {
+            font-size: 16px;
+        }
+
+        .window-selector .ws-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .window-selector select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--gold);
+            padding: 5px 8px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .window-selector select:focus {
+            outline: none;
+            border-color: var(--gold);
         }
 
         .control-group {
@@ -987,7 +1040,39 @@
             </div>
         </div>
 
-        <!-- Controls -->
+        <!-- Controls: 구간별 세트 수 선택 -->
+        <div class="window-selectors">
+            <div class="window-selector">
+                <span class="ws-icon">🔥</span>
+                <span class="ws-name">최근 30회</span>
+                <select id="sets30">
+                    <option value="3">3세트</option>
+                    <option value="5" selected>5세트</option>
+                    <option value="7">7세트</option>
+                    <option value="10">10세트</option>
+                </select>
+            </div>
+            <div class="window-selector">
+                <span class="ws-icon">⚡</span>
+                <span class="ws-name">최근 50회</span>
+                <select id="sets50">
+                    <option value="3">3세트</option>
+                    <option value="5" selected>5세트</option>
+                    <option value="7">7세트</option>
+                    <option value="10">10세트</option>
+                </select>
+            </div>
+            <div class="window-selector">
+                <span class="ws-icon">🌊</span>
+                <span class="ws-name">최근 100회</span>
+                <select id="sets100">
+                    <option value="3">3세트</option>
+                    <option value="5" selected>5세트</option>
+                    <option value="7">7세트</option>
+                    <option value="10">10세트</option>
+                </select>
+            </div>
+        </div>
         <div class="controls">
             <button class="btn-predict" id="predictBtn" onclick="runPrediction()">
                 <span class="btn-text">🎱 예측 실행</span>
@@ -1090,17 +1175,30 @@
             btn.classList.add('loading');
 
             try {
+                const sets30 = parseInt(document.getElementById('sets30').value);
+                const sets50 = parseInt(document.getElementById('sets50').value);
+                const sets100 = parseInt(document.getElementById('sets100').value);
+
                 const res = await fetch('/api/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         windows: [30, 50, 100],
-                        sets_per_window: 7
+                        sets_per_window_map: { '30': sets30, '50': sets50, '100': sets100 }
                     })
                 });
                 const data = await res.json();
+                console.log('API Response:', data);
+
+                if (!data || !data.windows_data) {
+                    console.error('Invalid response structure:', data);
+                    showToast('❌ 서버 응답 형식이 올바르지 않습니다. app.py를 업데이트해주세요.');
+                    return;
+                }
+
                 renderResults(data);
-                showToast('🎱 ' + data.global_stats.total_sets + '세트 예측 완료! (구간별 7세트 × 3)');
+                const total = data.global_stats.total_sets;
+                showToast(`🎱 총 ${total}세트 예측 완료! (${sets30}+${sets50}+${sets100})`);
             } catch (e) {
                 console.error('Prediction error:', e);
                 showToast('❌ 예측 중 오류가 발생했습니다');
@@ -1134,6 +1232,13 @@
         // === Render Functions ===
         function renderResults(data) {
             const container = document.getElementById('resultsContainer');
+
+            // 안전 체크
+            if (!data || !data.windows_data || !data.global_stats) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">서버 응답 형식 오류</div><div class="empty-sub">app.py와 index.html이 모두 최신 버전인지 확인해주세요</div></div>';
+                return;
+            }
+
             const { windows_data, global_stats } = data;
             const windowKeys = Object.keys(windows_data).sort((a, b) => parseInt(a) - parseInt(b));
             const windowLabels = { '30': '단기 트렌드', '50': '중기 트렌드', '100': '장기 트렌드' };
