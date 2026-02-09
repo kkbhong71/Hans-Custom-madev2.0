@@ -374,6 +374,148 @@
             margin-bottom: 32px;
         }
 
+        .window-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .window-tab {
+            flex: 1;
+            padding: 14px 16px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            position: relative;
+            text-align: center;
+        }
+
+        .window-tab:not(:last-child) {
+            border-right: 1px solid var(--border);
+        }
+
+        .window-tab .tab-period {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .window-tab .tab-desc {
+            display: block;
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        .window-tab .tab-sets {
+            display: inline-block;
+            margin-top: 4px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.05);
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .window-tab.active {
+            background: rgba(212,168,83,0.12);
+            color: var(--gold);
+        }
+
+        .window-tab.active .tab-period {
+            color: var(--gold-light);
+        }
+
+        .window-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 20%;
+            right: 20%;
+            height: 3px;
+            background: var(--gold);
+            border-radius: 3px 3px 0 0;
+        }
+
+        .window-tab:hover:not(.active) {
+            background: rgba(255,255,255,0.03);
+            color: var(--text-primary);
+        }
+
+        .window-panel {
+            display: none;
+            animation: fadeUp 0.35s ease;
+        }
+
+        .window-panel.active {
+            display: block;
+        }
+
+        .window-stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            flex-wrap: wrap;
+        }
+
+        .window-stat-item {
+            text-align: center;
+        }
+
+        .window-stat-item .ws-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .window-stat-item .ws-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--emerald);
+        }
+
+        .window-stat-item .ws-value.gold {
+            color: var(--gold);
+        }
+
+        .pool-pills {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .pool-pill {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .pool-pill.hot { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
+        .pool-pill.warm { background: rgba(212,168,83,0.12); color: var(--gold); border: 1px solid rgba(212,168,83,0.2); }
+        .pool-pill.cold { background: rgba(59,130,246,0.12); color: #3b82f6; border: 1px solid rgba(59,130,246,0.2); }
+
         .window-label {
             display: flex;
             align-items: center;
@@ -847,15 +989,6 @@
 
         <!-- Controls -->
         <div class="controls">
-            <div class="control-group">
-                <label>세트 수</label>
-                <select id="outputCount">
-                    <option value="7">7세트</option>
-                    <option value="14">14세트</option>
-                    <option value="21" selected>21세트</option>
-                    <option value="28">28세트</option>
-                </select>
-            </div>
             <button class="btn-predict" id="predictBtn" onclick="runPrediction()">
                 <span class="btn-text">🎱 예측 실행</span>
                 <span class="spinner"></span>
@@ -957,18 +1090,17 @@
             btn.classList.add('loading');
 
             try {
-                const outputCount = parseInt(document.getElementById('outputCount').value);
                 const res = await fetch('/api/predict', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         windows: [30, 50, 100],
-                        output_count: outputCount
+                        sets_per_window: 7
                     })
                 });
                 const data = await res.json();
                 renderResults(data);
-                showToast('🎱 ' + data.stats.total_sets + '세트 예측 완료!');
+                showToast('🎱 ' + data.global_stats.total_sets + '세트 예측 완료! (구간별 7세트 × 3)');
             } catch (e) {
                 console.error('Prediction error:', e);
                 showToast('❌ 예측 중 오류가 발생했습니다');
@@ -1002,14 +1134,10 @@
         // === Render Functions ===
         function renderResults(data) {
             const container = document.getElementById('resultsContainer');
-            const { results, stats } = data;
-
-            // Group by window
-            const byWindow = {};
-            results.forEach(r => {
-                if (!byWindow[r.window]) byWindow[r.window] = [];
-                byWindow[r.window].push(r);
-            });
+            const { windows_data, global_stats } = data;
+            const windowKeys = Object.keys(windows_data).sort((a, b) => parseInt(a) - parseInt(b));
+            const windowLabels = { '30': '단기 트렌드', '50': '중기 트렌드', '100': '장기 트렌드' };
+            const windowIcons = { '30': '🔥', '50': '⚡', '100': '🌊' };
 
             let html = `
                 <div class="results-header">
@@ -1018,48 +1146,81 @@
                         <div class="cov-stat">
                             <span class="icon">📊</span>
                             <div>
-                                <div class="cov-label">커버리지</div>
-                                <div class="cov-value">${stats.coverage}/45 (${stats.coverage_pct}%)</div>
-                            </div>
-                        </div>
-                        <div class="cov-stat">
-                            <span class="icon">🔗</span>
-                            <div>
-                                <div class="cov-label">평균 겹침</div>
-                                <div class="cov-value">${stats.avg_overlap}개</div>
+                                <div class="cov-label">전체 커버리지</div>
+                                <div class="cov-value">${global_stats.coverage}/45 (${global_stats.coverage_pct}%)</div>
                             </div>
                         </div>
                         <div class="cov-stat">
                             <span class="icon">🎯</span>
                             <div>
                                 <div class="cov-label">총 세트</div>
-                                <div class="cov-value">${stats.total_sets}세트</div>
+                                <div class="cov-value">${global_stats.total_sets}세트</div>
                             </div>
                         </div>
                     </div>
-                    ${stats.uncovered.length > 0 ? `<p style="font-size:12px;color:var(--text-muted);">미커버 번호: ${stats.uncovered.join(', ')}</p>` : ''}
+                    ${global_stats.uncovered.length > 0 ? `<p style="font-size:12px;color:var(--text-muted);">전체 미커버 번호: ${global_stats.uncovered.join(', ')}</p>` : ''}
+                </div>
+
+                <!-- Window Sub-Tabs -->
+                <div class="window-tabs">
+                    ${windowKeys.map((w, i) => {
+                        const wd = windows_data[w];
+                        return `
+                            <button class="window-tab ${i === 0 ? 'active' : ''}" 
+                                    onclick="switchWindowTab('${w}')">
+                                <span class="tab-period">${windowIcons[w] || ''} 최근 ${w}회</span>
+                                <span class="tab-desc">${windowLabels[w] || ''}</span>
+                                <span class="tab-sets">${wd.stats.total_sets}세트</span>
+                            </button>
+                        `;
+                    }).join('')}
                 </div>
             `;
 
-            const windowLabels = { 30: '단기 트렌드', 50: '중기 트렌드', 100: '장기 트렌드' };
+            // Window Panels
+            windowKeys.forEach((w, i) => {
+                const wd = windows_data[w];
+                const { results: items, stats, pool_info } = wd;
 
-            Object.keys(byWindow).sort((a, b) => a - b).forEach(w => {
-                const items = byWindow[w];
+                html += `<div class="window-panel ${i === 0 ? 'active' : ''}" id="window-panel-${w}">`;
+
+                // Pool Info Pills
                 html += `
-                    <div class="window-group">
-                        <div class="window-label">
-                            <span class="badge">최근 ${w}회</span>
-                            <span class="desc">${windowLabels[w] || ''} · ${items.length}세트</span>
-                        </div>
-                        <div class="prediction-grid">
+                    <div class="pool-pills">
+                        <span class="pool-pill hot">🔥 Hot ${pool_info.hot_count}개</span>
+                        <span class="pool-pill warm">🌤️ Warm ${pool_info.warm_count}개</span>
+                        <span class="pool-pill cold">❄️ Cold ${pool_info.cold_count}개</span>
+                    </div>
                 `;
 
-                items.forEach((item, idx) => {
+                // Per-window Stats
+                html += `
+                    <div class="window-stats">
+                        <div class="window-stat-item">
+                            <div class="ws-label">커버리지</div>
+                            <div class="ws-value">${stats.coverage}/45 (${stats.coverage_pct}%)</div>
+                        </div>
+                        <div class="window-stat-item">
+                            <div class="ws-label">평균 겹침</div>
+                            <div class="ws-value gold">${stats.avg_overlap}개</div>
+                        </div>
+                        <div class="window-stat-item">
+                            <div class="ws-label">세트 수</div>
+                            <div class="ws-value gold">${stats.total_sets}세트</div>
+                        </div>
+                    </div>
+                    ${stats.uncovered.length > 0 ? `<p style="font-size:11px;color:var(--text-muted);text-align:center;margin-bottom:16px;">미커버 번호: ${stats.uncovered.join(', ')}</p>` : ''}
+                `;
+
+                // Cards Grid
+                html += `<div class="prediction-grid">`;
+
+                const secColors = ['var(--ball-yellow)', 'var(--ball-blue)', 'var(--ball-red)', 'var(--ball-gray)', 'var(--ball-green)'];
+
+                items.forEach(item => {
                     const icon = item.algo_code === 'F' ? '🌟' : (item.algo_code === 'G' ? '🛡️' : '🔹');
                     const cardClass = item.algo_code === 'F' ? 'star' : (item.algo_code === 'G' ? 'shield' : '');
                     const numsStr = item.numbers.join(', ');
-
-                    const secColors = ['var(--ball-yellow)', 'var(--ball-blue)', 'var(--ball-red)', 'var(--ball-gray)', 'var(--ball-green)'];
 
                     html += `
                         <div class="pred-card ${cardClass}">
@@ -1094,6 +1255,15 @@
             });
 
             container.innerHTML = html;
+        }
+
+        function switchWindowTab(windowId) {
+            document.querySelectorAll('.window-tab').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('onclick').includes("'" + windowId + "'"));
+            });
+            document.querySelectorAll('.window-panel').forEach(panel => {
+                panel.classList.toggle('active', panel.id === 'window-panel-' + windowId);
+            });
         }
 
         function renderFreqChart(data) {
