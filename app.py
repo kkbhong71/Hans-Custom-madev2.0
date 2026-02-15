@@ -623,7 +623,7 @@ class BrotherLottoSystem:
 # =============================================================================
 # Global system instance
 # =============================================================================
-csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new_1210.csv')
+csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new_1211.csv')
 system = BrotherLottoSystem(csv_path)
 system_info = system.load_data()
 
